@@ -1,0 +1,158 @@
+﻿@page "/job-tracker"
+@rendermode InteractiveServer
+
+@using System.ComponentModel.DataAnnotations;
+@using System.Linq;
+@using System.Security.Claims;
+@using JobTracking.Data;
+@using JobTracking.Services;
+@using Microsoft.AspNetCore.Authorization;
+@using Microsoft.AspNetCore.Components.QuickGrid;
+@using Microsoft.Extensions.Options
+
+@inject JobService jobService;
+
+@attribute [Authorize]
+
+<PageTitle>Jobs Applied</PageTitle>
+
+
+<button type="button" class="btn btn-primary" @onclick="() => isOpenModal = true">
+    Add Application
+</button>
+
+
+<JobTrackerModal
+@bind-IsOpen="isOpenModal"
+UserId="@UserId"
+OnApplicationSaved="OnNewSavedJob"
+/>
+
+<EditForm Model="jobList">
+<QuickGrid Items="@gridData">
+    <TemplateColumn Title="Position" Context="row">
+        @if (row.IsEditing) {
+            <InputText @bind-Value="row.data.Position" class="form-control"/>
+        } else
+            @row.data.Position
+    </TemplateColumn>
+    
+    <TemplateColumn Title="Yearly Salary" Context="row">
+         @if (row.IsEditing) {
+            <InputNumber @bind-Value="row.data.YearlySalary" class="form-control"/>
+        } else
+            @row.data.YearlySalary
+    </TemplateColumn>
+
+    <TemplateColumn Title="Company" Context="row">
+        @if (row.IsEditing) {
+            <InputText @bind-Value="row.data.Company.Name" class="form-control" />
+        } else
+            @row.data.Company.Name
+    </TemplateColumn>
+
+    <TemplateColumn Title="Status" Context="row">
+        @if (row.IsEditing) {
+            <InputSelect @bind-Value="row.data.Status" class="form-select">
+            @foreach (var status in Enum.GetValues<JobStatus>()) {
+                <option value="@status">@status</option>
+            }
+            </InputSelect>
+        } else {
+            <p class="text-center mt-3">@row.data.Status</p>
+        }
+        
+    </TemplateColumn>
+.
+
+  
+
+    <TemplateColumn Title="Date Applied" Context="row">
+         @if (row.IsEditing) {
+            <InputDate @bind-Value="row.data.DateApplied"/>
+        } else
+            @row.data.DateApplied
+    </TemplateColumn>
+    <TemplateColumn Title="Job Post Url" Context="row">
+         @if (row.IsEditing) {
+            <InputText @bind-Value="row.data.JobPostLink"/>
+        } else
+            @row.data.JobPostLink
+    </TemplateColumn>
+    <TemplateColumn Title="Notes" Context="row">
+         @if (row.IsEditing) {
+            <InputText @bind-Value="row.data.Notes"/>
+        } else
+            @row.data.Notes
+    </TemplateColumn>
+
+    <TemplateColumn Title="Last Update" Context="row">
+        @row.data.LastUpdate
+    </TemplateColumn>
+
+    <TemplateColumn Title="Actions" Context="row">
+        @if (@row.IsEditing) {
+            <button class="btn btn-sm btn-success" @onclick="() => SaveRow(row)">Save</button>
+            <button class="btn btn-sm btn-secondary" @onclick="() => row.IsEditing = false">Cancel</button>
+        } else {
+            <button class="btn btn-sm btn-primary" @onclick="() => row.IsEditing = true">Edit</button>
+            <button class="btn btn-sm btn-danger" @onclick="() => DeleteRow(row)">Delete</button>
+        }
+    </TemplateColumn>
+</QuickGrid>
+</EditForm>
+
+@code {
+    private List<jobAppViewModel> jobList { get; set; } = new();
+    private IQueryable<jobAppViewModel> gridData => jobList.AsQueryable();
+    private bool isOpenModal = false;
+
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthStateTask { get; set; } = null!;
+    private string? UserId { get; set; } = string.Empty;
+
+    protected override async Task OnInitializedAsync() {
+        List<JobApplication> rawList = await jobService.GetMyJobApplications();
+        var authState = await AuthStateTask;
+
+        UserId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        jobList = rawList.Select(jobApp => new jobAppViewModel
+        {
+            data = jobApp,
+            IsEditing = false
+
+        }).ToList();
+
+    }
+
+    private async Task SaveRow(jobAppViewModel row) {
+        await jobService.UpdateJobApplication(row.data);
+        row.IsEditing = false;
+        StateHasChanged();
+    }
+
+    private async Task DeleteRow(jobAppViewModel row) {
+        await jobService.DeleteAsync(row.data);
+        jobList.Remove(row);
+    }
+
+    private async Task OnNewSavedJob(JobApplication jobApplication) {
+
+        var newJobView = new jobAppViewModel {
+            data = jobApplication,
+            IsEditing = false
+        };
+
+        jobList.Add(newJobView);
+
+    }
+
+   
+  
+    public class jobAppViewModel {
+        public JobApplication data { get; set; } = default!;
+        public bool IsEditing { get; set; }
+    }
+
+
+}

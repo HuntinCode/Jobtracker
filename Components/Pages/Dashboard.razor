@@ -1,0 +1,82 @@
+﻿@page "/dashboard"
+@using JobTracking.Data
+@using JobTracking.Services
+
+@rendermode InteractiveServer
+
+
+@inject JobService jobService;
+
+<PageTitle>Dashboard</PageTitle>
+
+<div class="row row-cols-1 row-cols-md-2 g-4">
+  <div class="col">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">Interviewing</h5>
+        <p class="card-text">@statusDict.GetValueOrDefault("Interviewing")</p>
+      </div>
+    </div>
+  </div>
+  <div class="col">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">Applied</h5>
+        <p class="card-text">@statusDict.GetValueOrDefault("Applied")</p>
+      </div>
+    </div>
+  </div>
+  <div class="col">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">Screening</h5>
+        <p class="card-text">@statusDict.GetValueOrDefault("Screening")</p>
+      </div>
+    </div>
+  </div>
+  <div class="col">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">Rejected</h5>
+        <p class="card-text">@statusDict.GetValueOrDefault("Rejected")</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="container w-50">
+    <ApexChart TItem="StatusCounts" >
+
+        <ApexPointSeries
+        TItem="StatusCounts"
+        Items="@statusCounts"
+        Name="Applications"
+        SeriesType="SeriesType.Donut"
+        XValue="item => item.Status"
+        YValue="item => item.Count"
+        />
+
+    </ApexChart>
+
+</div>
+
+
+
+@code {
+    private List<StatusCounts> statusCounts = new();
+    private Dictionary<string, int> statusDict = new();
+    protected override async Task OnInitializedAsync() {
+        
+        statusDict = await jobService.GetJobApplicationStatusCountsAsync();
+        statusCounts = statusDict.Select(item => new StatusCounts {
+            Status = item.Key,
+            Count = item.Value
+        }).ToList();
+    }
+
+    public class StatusCounts {
+        public string Status { get; set; } = "";
+        public int Count { get; set; }
+    }
+
+}

@@ -1,0 +1,128 @@
+﻿@using System.ComponentModel.DataAnnotations
+@using JobTracking.Data
+@using JobTracking.Services
+
+@inject JobService jobService
+
+@if (IsOpen)
+{
+    <div class="modal fade show d-block" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h1 class="modal-title">New Application</h1>
+                    <button type="button" class="btn-close" @onclick="CloseModal" aria-label="Close"></button>
+                </div>
+                <EditForm Model="newJobApp" OnValidSubmit="HandleValidSubmit">
+                    <div class="modal-body">
+                        <div class="container-fluid">
+                            <div class="row mb-3">
+                                <div class="col">
+                                    <label class="form-label">Position</label>
+                                    <InputText class="form-control" @bind-Value="newJobApp.Position" />
+                                </div>
+                                <div class="col">
+                                    <label class="form-label">Yearly Salary</label>
+                                    <InputNumber class="form-control" @bind-Value="newJobApp.YearlySalary" />
+                                </div>
+                                <div class="col">
+                                    <label class="form-label">Company Name</label>
+                                    <InputText class="form-control" @bind-Value="newJobApp.CompanyName" />
+                                </div>
+                                <div class="col">
+                                    <label class="form-label">Status</label>
+                                    <InputSelect @bind-Value="newJobApp.Status" class="form-select">
+                                        @foreach (var status in Enum.GetValues<JobStatus>()) {
+                                            <option value="@status">@status</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+                                <div class="col">
+                                    <label class="form-label">Date Applied</label>
+                                    <InputDate class="form-control" @bind-Value="newJobApp.DateApplied" />
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col">
+                                    <label class="form-label">Job Post URL</label>
+                                    <InputText class="form-control" @bind-Value="newJobApp.JobPostLink" />
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col">
+                                    <label class="form-label">Notes</label>
+                                    <InputTextArea class="form-control" @bind-Value="newJobApp.Notes" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
+                        <button type="submit" class="btn btn-success btn-lg px-5">Add Your Application</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public EventCallback<JobApplication> OnApplicationSaved { get; set; }
+    [Parameter] public string? UserId { get; set; }
+
+    private JobAppFormModel newJobApp { get; set; } = new();
+
+    protected override void OnParametersSet()
+    {
+        if (IsOpen)
+        {
+            newJobApp = new(); // Reset form fields when opened
+        }
+    }
+
+    private async Task CloseModal()
+    {
+        IsOpen = false;
+        await IsOpenChanged.InvokeAsync(false);
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        var newCompany = new Company { Name = newJobApp.CompanyName };
+
+        var domainModel = new JobApplication
+        {
+            Position = newJobApp.Position,
+            YearlySalary = newJobApp.YearlySalary,
+            Status = newJobApp.Status,
+            UserId = UserId!,
+            DateApplied = DateOnly.FromDateTime(newJobApp.DateApplied),
+            JobPostLink = newJobApp.JobPostLink,
+            Notes = newJobApp.Notes,
+            
+            User = null!,
+            Company = newCompany
+        };
+
+        var savedApplication = await jobService.CreateAsync(domainModel);
+        
+        // Pass data up to parent and notify closing state
+        await OnApplicationSaved.InvokeAsync(savedApplication);
+        await CloseModal();
+    }
+
+    public class JobAppFormModel
+    {
+        public string Position { get; set; } = string.Empty;
+        public int YearlySalary { get; set; } = 0;
+        public JobStatus Status { get; set; }
+        public string CompanyName { get; set; } = string.Empty;
+        public DateTime DateApplied { get; set; } = DateTime.Today;
+        public string JobPostLink { get; set; } = string.Empty;
+        public string Notes { get; set; } = string.Empty;
+    }
+}
